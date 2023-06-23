@@ -11,7 +11,6 @@ export const CountdownTimer = ({ endTime }: { endTime?: number }) => {
     const interval = setInterval(() => {
       const now = new Date().getTime();
       const distance = +countDownDate - now;
-      console.log("distance", distance);
 
       const seconds = Math.floor((distance % (1000 * 60)) / 1000);
 

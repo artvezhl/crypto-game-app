@@ -1,8 +1,13 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useMemo } from "react";
 import "./App.css";
 import { Button } from "../shared/ui/Button";
 import { useAppStore } from "../shared";
-import { MetamaskButton, StartGameButton } from "../features";
+import {
+  CalculateWinningButton,
+  MetamaskButton,
+  SelectWinnerButton,
+  StartGameButton,
+} from "../features";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import { CountdownTimer } from "../features";
@@ -11,22 +16,28 @@ import { GuessForm } from "../widgets";
 function App() {
   const [
     init,
-    web3,
     wallet,
     isContractOwner,
     endTimerTime,
     endTimerRevealTime,
     isSubmissionPhase,
     isRevealPhase,
+    isPhase,
+    isCalculateWinningPhase,
+    isGuessSubmitted,
+    countdownTimer,
   ] = useAppStore((state) => [
     state.init,
-    state.web3,
     state.wallet,
     state.isContractOwner,
     state.endTimerTime,
     state.endTimerRevealTime,
     state.isSubmissionPhase,
     state.isRevealPhase,
+    state.isPhase,
+    state.isCalculateWinningPhase,
+    state.isGuessSubmitted,
+    state.countdownTimer,
   ]);
 
   useEffect(() => {
@@ -56,12 +67,16 @@ function App() {
           </p>
         </div>
 
-        {isContractOwner && <StartGameButton />}
+        {isContractOwner && !isPhase() && !isGuessSubmitted && (
+          <StartGameButton />
+        )}
+        {isContractOwner && <CalculateWinningButton />}
+        {isContractOwner && <SelectWinnerButton />}
         {isSubmissionPhase() && (
           <div id="submissionTitle">SUBMISSION PHASE IS OPEN</div>
         )}
         {isRevealPhase() && <div id="revealTitle">REVEAL PHASE IS OPEN</div>}
-        {(isSubmissionPhase() || isRevealPhase()) && (
+        {isPhase() && (
           <CountdownTimer
             endTime={isSubmissionPhase() ? endTimerTime : endTimerRevealTime}
           />

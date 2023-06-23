@@ -18,21 +18,29 @@ type AppStoreState = {
   endTimerRevealTime?: number;
   submissionPeriod: number;
   revealingPeriod: number;
+  countdownTimer: number;
+  isGuessSubmitted: boolean;
+  isSelectWinnerButtonActive: boolean;
 };
 
 type AppStoreActions = {
+  isPhase: () => boolean;
   isSubmissionPhase: () => boolean;
   isRevealPhase: () => boolean;
+  isCalculateWinningPhase: () => boolean;
   init: () => Promise<void>;
+  initEventSubscription: () => Promise<void>;
   connect: () => Promise<void>;
   disconnect: () => void;
   startGame: () => void;
+  setCountdownTimer: (endTime: number) => void;
   enterGuess: (values: { guess: number; salt: number }) => Promise<void>;
   revealSaltAndGuess: (values: {
     guess: number;
     salt: number;
   }) => Promise<void>;
   calculateWinningGuess: () => Promise<void>;
+  selectWinner: () => Promise<void>;
 };
 type AppStore = AppStoreState & AppStoreActions;
 
@@ -45,6 +53,10 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   endTimerRevealTime: undefined,
   submissionPeriod: 0,
   revealingPeriod: 0,
+  countdownTimer: 0,
+  isGuessSubmitted: false,
+  isSelectWinnerButtonActive: false,
+  isPhase: () => get().isSubmissionPhase() || get().isRevealPhase(),
   isSubmissionPhase: () => {
     const submission = get().endTimerTime;
     if (!submission) return false;
@@ -62,6 +74,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       reveal - new Date().getTime() > 0 && reveal - new Date().getTime() < 60000
     );
   },
+  isCalculateWinningPhase: () => !get().isPhase(),
   period: null,
   init: async () => {
     if (window.ethereum) {
@@ -123,6 +136,55 @@ export const useAppStore = create<AppStore>()((set, get) => ({
           1000;
         set({ endTimerTime, endTimerRevealTime });
       }
+      // await get().initEventSubscription();
+    }
+  },
+  initEventSubscription: async () => {
+    const contract = get().contractInstance;
+
+    const gameStartedEventSubscription = contract?.events.GameStarted();
+    const guessSubmittedEventSubscription = contract?.events.GuessSubmitted();
+    const winningGuessCalculatedEventSubscription =
+      contract?.events.WinningGuessCalculated();
+    const submissionPeriod = get().submissionPeriod;
+
+    if (gameStartedEventSubscription) {
+      gameStartedEventSubscription.on("data", async (event) => {
+        toast.success("The game is started");
+        const timestamp = event.returnValues.timestamp;
+        const endTimerTime =
+          (Number(timestamp) + Number(submissionPeriod)) * 1000;
+        set({ endTimerTime });
+
+        await gameStartedEventSubscription.unsubscribe();
+      });
+      gameStartedEventSubscription.on("error", (error) => {
+        toast.error(error.message);
+        console.error("Subscription error:", error);
+      });
+    }
+
+    if (winningGuessCalculatedEventSubscription) {
+      winningGuessCalculatedEventSubscription.on("data", async (event) => {
+        console.log("EVENT WINNING VALUES", event);
+        toast.success("The winning guess is calculated");
+        await winningGuessCalculatedEventSubscription.unsubscribe();
+      });
+      winningGuessCalculatedEventSubscription.on("error", (error) => {
+        toast.error(error.message);
+        console.error("Subscription error:", error);
+      });
+    }
+
+    if (guessSubmittedEventSubscription) {
+      guessSubmittedEventSubscription.on("data", async (event) => {
+        console.log("GUESS SUBMITTED", event);
+        await guessSubmittedEventSubscription.unsubscribe();
+        set({ isGuessSubmitted: true });
+      });
+      guessSubmittedEventSubscription.on("error", (error) => {
+        console.error("guessSubmittedEventSubscription error:", error);
+      });
     }
   },
   connect: async () => {
@@ -176,7 +238,10 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       toast.info("Web3 is not available");
     }
   },
-  disconnect: () => set({ wallet: null, isContractOwner: false }),
+  disconnect: () => {
+    set({ wallet: null, isContractOwner: false });
+    localStorage.removeItem("wallet");
+  },
   startGame: async () => {
     const gasPrice = await get().web3?.eth.getGasPrice();
     const contract = get().contractInstance;
@@ -190,11 +255,11 @@ export const useAppStore = create<AppStore>()((set, get) => ({
           .startGame()
           .send({
             from: get().wallet?.accounts[0],
-            gas: (Number(gasEstimation) * 500).toString(),
-            gasPrice: (Number(gasPrice) * 100000).toString(),
-            // value: (Number(gasEstimation) * 1000).toString(),
+            gas: (Number(gasEstimation) * 400).toString(),
+            gasPrice: (Number(gasPrice) * 1000).toString(),
           })
-          .then((data) => console.log("DATA", data));
+          .then((data) => console.log("DATA", data))
+          .catch((error) => toast.error(error?.message));
         const startGameSubscription = await contract?.events.GameStarted();
 
         startGameSubscription?.on("data", async (eventLog) => {
@@ -215,58 +280,100 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       }
     }
   },
-  // SET GAS ESTIMATION
+  setCountdownTimer: (endTime: number) => {
+    const countDownDate = new Date(endTime);
+
+    const interval = setInterval(() => {
+      const now = new Date().getTime();
+      const distance = +countDownDate - now;
+
+      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
+      set({ countdownTimer: seconds });
+
+      if (distance < 0) {
+        clearInterval(interval);
+        set({ countdownTimer: 0 });
+      }
+    }, 1000);
+  },
   enterGuess: async (values) => {
+    const { guess, salt } = values;
     const contract = get().contractInstance;
     const fee: BigInt | undefined = await contract?.methods
       .participationFee()
       .call();
-    const gasEstimation = await contract?.methods.enterGuess().estimateGas();
+    const TXOptions = {
+      from: get().wallet?.accounts[0],
+      gas: 5000000,
+      value: fee,
+    };
     if (contract) {
-      // @ts-ignore
-      await contract?.methods.enterGuess(values.guess, values.salt).send({
-        from: get().wallet?.accounts[0],
-        gas: (Number(gasEstimation) * 600).toString(),
-        value: fee ? Number(fee).toString() : "0",
-      });
+      try {
+        // @ts-ignore
+        await contract?.methods.enterGuess(guess, salt).send(TXOptions);
+      } catch (error: any) {
+        toast.error(error?.message);
+      }
     }
   },
   // SET GAS ESTIMATION
   revealSaltAndGuess: async (values) => {
+    const { guess, salt } = values;
     const contract = get().contractInstance;
     const fee: BigInt | undefined = await contract?.methods
+      // @ts-ignore
       .participationFee()
       .call();
-    const gasEstimation = await contract?.methods.startGame().estimateGas();
+
+    const TXOptions = {
+      from: get().wallet?.accounts[0],
+      gas: 5000000,
+      value: fee,
+    };
+
     if (contract) {
-      await contract?.methods
+      try {
         // @ts-ignore
-        .revealSaltAndGuess(values.guess, values.salt)
-        .send({
-          from: get().wallet?.accounts[0],
-          gas: (Number(gasEstimation) * 600).toString(),
-          value: fee ? Number(fee).toString() : "0",
-        });
+        await contract?.methods.revealSaltAndGuess(guess, salt).send(TXOptions);
+      } catch (error: any) {
+        toast.error(error?.message);
+      }
     }
   },
-  // TODO
   calculateWinningGuess: async () => {
     const contract = get().contractInstance;
-    // const fee: BigInt | undefined = await contract?.methods
-    //   .participationFee()
-    //   .call();
-    // const gasEstimation = await contract?.methods
-    //   .startGame()
-    //   .estimateGas({ from: get().wallet?.accounts[0] });
-    // if (contract) {
-    //   await contract?.methods
-    //     // @ts-ignore
-    //     .revealSaltAndGuess(values.guess, values.salt)
-    //     .send({
-    //       from: get().wallet?.accounts[0],
-    //       gas: (Number(gasEstimation) * 600).toString(),
-    //       // value: fee ? Number(fee).toString() : "0",
-    //     });
-    // }
+    if (contract) {
+      try {
+        await contract?.methods
+          .calculateWinningGuess()
+          .call({ from: get().wallet?.accounts[0] });
+      } catch (error: any) {
+        toast.error(error.message);
+      }
+
+      const winningGuessCalculatedSubscription =
+        await contract?.events.WinningGuessCalculated();
+      winningGuessCalculatedSubscription?.on("data", async (eventLog) => {
+        toast.success("The winning guess is calculated");
+        set({ isSelectWinnerButtonActive: true });
+
+        await winningGuessCalculatedSubscription.unsubscribe();
+      });
+      winningGuessCalculatedSubscription.on("error", (error) =>
+        console.log("Error when subscribing: ", error)
+      );
+    }
+  },
+  selectWinner: async () => {
+    const contract = get().contractInstance;
+    if (contract) {
+      try {
+        await contract?.methods
+          .selectWinner()
+          .call({ from: get().wallet?.accounts[0] });
+      } catch (error: any) {
+        toast.error(error.message);
+      }
+    }
   },
 }));
