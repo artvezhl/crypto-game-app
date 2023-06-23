@@ -215,15 +215,13 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       }
     }
   },
+  // SET GAS ESTIMATION
   enterGuess: async (values) => {
     const contract = get().contractInstance;
     const fee: BigInt | undefined = await contract?.methods
       .participationFee()
-      .call({ from: get().wallet?.accounts[0] });
-    console.log("FEE", fee);
-    const gasEstimation = await contract?.methods
-      .enterGuess()
-      .estimateGas({ from: get().wallet?.accounts[0] });
+      .call();
+    const gasEstimation = await contract?.methods.enterGuess().estimateGas();
     if (contract) {
       // @ts-ignore
       await contract?.methods.enterGuess(values.guess, values.salt).send({
@@ -233,15 +231,13 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       });
     }
   },
-  // TODO add fee
+  // SET GAS ESTIMATION
   revealSaltAndGuess: async (values) => {
     const contract = get().contractInstance;
-    // const fee: BigInt | undefined = await contract?.methods
-    //   .participationFee()
-    //   .call();
-    const gasEstimation = await contract?.methods
-      .startGame()
-      .estimateGas({ from: get().wallet?.accounts[0] });
+    const fee: BigInt | undefined = await contract?.methods
+      .participationFee()
+      .call();
+    const gasEstimation = await contract?.methods.startGame().estimateGas();
     if (contract) {
       await contract?.methods
         // @ts-ignore
@@ -249,27 +245,28 @@ export const useAppStore = create<AppStore>()((set, get) => ({
         .send({
           from: get().wallet?.accounts[0],
           gas: (Number(gasEstimation) * 600).toString(),
-          // value: fee ? Number(fee).toString() : "0",
+          value: fee ? Number(fee).toString() : "0",
         });
     }
   },
+  // TODO
   calculateWinningGuess: async () => {
     const contract = get().contractInstance;
     // const fee: BigInt | undefined = await contract?.methods
     //   .participationFee()
     //   .call();
-    const gasEstimation = await contract?.methods
-      .startGame()
-      .estimateGas({ from: get().wallet?.accounts[0] });
-    if (contract) {
-      await contract?.methods
-        // @ts-ignore
-        .revealSaltAndGuess(values.guess, values.salt)
-        .send({
-          from: get().wallet?.accounts[0],
-          gas: (Number(gasEstimation) * 600).toString(),
-          // value: fee ? Number(fee).toString() : "0",
-        });
-    }
+    // const gasEstimation = await contract?.methods
+    //   .startGame()
+    //   .estimateGas({ from: get().wallet?.accounts[0] });
+    // if (contract) {
+    //   await contract?.methods
+    //     // @ts-ignore
+    //     .revealSaltAndGuess(values.guess, values.salt)
+    //     .send({
+    //       from: get().wallet?.accounts[0],
+    //       gas: (Number(gasEstimation) * 600).toString(),
+    //       // value: fee ? Number(fee).toString() : "0",
+    //     });
+    // }
   },
 }));

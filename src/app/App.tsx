@@ -71,12 +71,12 @@ function App() {
           !isContractOwner &&
           (isSubmissionPhase() || isRevealPhase()) && <GuessForm />}
 
-        <button id="calculateWinningGuessButton" disabled>
-          Calculate winning guess
-        </button>
-        <button id="selectWinnerButton" disabled>
-          Select winner
-        </button>
+        {/*<button id="calculateWinningGuessButton" disabled>*/}
+        {/*  Calculate winning guess*/}
+        {/*</button>*/}
+        {/*<button id="selectWinnerButton" disabled>*/}
+        {/*  Select winner*/}
+        {/*</button>*/}
       </body>
       <ToastContainer position="bottom-right" />
     </>
