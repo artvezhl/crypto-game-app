@@ -2,35 +2,39 @@ import React, { useEffect } from "react";
 import "./App.css";
 import { Button } from "../shared/ui/Button";
 import { useAppStore } from "../shared";
-import { MetamaskButton } from "../features";
+import { MetamaskButton, StartGameButton } from "../features";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
+import { CountdownTimer } from "../features";
+import { GuessForm } from "../widgets";
 
 function App() {
-  const [init, web3] = useAppStore((state) => [state.init, state.web3]);
+  const [
+    init,
+    web3,
+    wallet,
+    isContractOwner,
+    endTimerTime,
+    endTimerRevealTime,
+    isSubmissionPhase,
+    isRevealPhase,
+  ] = useAppStore((state) => [
+    state.init,
+    state.web3,
+    state.wallet,
+    state.isContractOwner,
+    state.endTimerTime,
+    state.endTimerRevealTime,
+    state.isSubmissionPhase,
+    state.isRevealPhase,
+  ]);
 
   useEffect(() => {
     init();
   }, [init]);
-  // useEffect(() => {
-  //   const fetchAccounts = async () => {
-  //     if (web3) {
-  //       // Создаем экземпляр Web3 с использованием провайдера от MetaMask
-  //       try {
-  //         // Запрашиваем доступ к аккаунтам пользователя
-  //         await window.ethereum.enable();
-  //         // Получаем список аккаунтов
-  //         const accounts = await web3.eth.getAccounts();
-  //         console.log("accounts", accounts);
-  //       } catch (error) {
-  //         console.error(error);
-  //       }
-  //     }
-  //   };
-  //
-  //   fetchAccounts();
-  // }, [web3]);
 
   return (
-    <div>
+    <>
       <header className="flex justify-end items-center px-6">
         <MetamaskButton />
       </header>
@@ -52,32 +56,20 @@ function App() {
           </p>
         </div>
 
-        <Button>Start Game</Button>
-        <div id="submissionTitle">SUBMISSION PHASE IS OPEN</div>
-        <div id="revealTitle">REVEAL PHASE IS OPEN</div>
-        <div id="countdownTimer"></div>
-        <div className="input-container">
-          <input
-            id="guessInput"
-            type="password"
-            placeholder="Your guess"
-            disabled
+        {isContractOwner && <StartGameButton />}
+        {isSubmissionPhase() && (
+          <div id="submissionTitle">SUBMISSION PHASE IS OPEN</div>
+        )}
+        {isRevealPhase() && <div id="revealTitle">REVEAL PHASE IS OPEN</div>}
+        {(isSubmissionPhase() || isRevealPhase()) && (
+          <CountdownTimer
+            endTime={isSubmissionPhase() ? endTimerTime : endTimerRevealTime}
           />
-          <i className="fas fa-eye" id="toggleGuessVisibility"></i>
-          <p id="guessError">This input is too large</p>
-        </div>
-        <div className="input-container">
-          <input
-            id="saltInput"
-            type="password"
-            placeholder="Your salt"
-            disabled
-          />
-          <i className="fas fa-eye" id="toggleSaltVisibility"></i>
-        </div>
-        <button id="enterGuessButton" disabled>
-          Submit your guess
-        </button>
+        )}
+
+        {wallet?.accounts.length &&
+          !isContractOwner &&
+          (isSubmissionPhase() || isRevealPhase()) && <GuessForm />}
 
         <button id="calculateWinningGuessButton" disabled>
           Calculate winning guess
@@ -86,7 +78,8 @@ function App() {
           Select winner
         </button>
       </body>
-    </div>
+      <ToastContainer position="bottom-right" />
+    </>
   );
 }
 
