@@ -10,9 +10,6 @@ export const MetamaskButton: React.FC = () => {
 
   return (
     <div className="flex justify-center flex-col">
-      {wallet?.connected && (
-        <p className="text-xs">Accounts: {wallet?.accounts.join(", ")}</p>
-      )}
       <Button
         loading={!!wallet?.loading}
         onClick={() => (!wallet?.connected ? connect() : disconnect())}

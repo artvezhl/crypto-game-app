@@ -23,9 +23,10 @@ function App() {
     isSubmissionPhase,
     isRevealPhase,
     isPhase,
-    isCalculateWinningPhase,
-    isGuessSubmitted,
+    isGuessesSubmitted,
+    isSaltSubmitted,
     countdownTimer,
+    isWinningGuessCalculated,
   ] = useAppStore((state) => [
     state.init,
     state.wallet,
@@ -35,9 +36,10 @@ function App() {
     state.isSubmissionPhase,
     state.isRevealPhase,
     state.isPhase,
-    state.isCalculateWinningPhase,
-    state.isGuessSubmitted,
+    state.isGuessesSubmitted,
+    state.isSaltSubmitted,
     state.countdownTimer,
+    state.isWinningGuessCalculated,
   ]);
 
   useEffect(() => {
@@ -67,11 +69,16 @@ function App() {
           </p>
         </div>
 
-        {isContractOwner && !isPhase() && !isGuessSubmitted && (
-          <StartGameButton />
+        {isContractOwner &&
+          !isPhase() &&
+          !isGuessesSubmitted &&
+          !isSaltSubmitted && <StartGameButton />}
+        {isContractOwner && isGuessesSubmitted && isSaltSubmitted && (
+          <CalculateWinningButton />
         )}
-        {isContractOwner && <CalculateWinningButton />}
-        {isContractOwner && <SelectWinnerButton />}
+        {/*<CalculateWinningButton />*/}
+        {isContractOwner && isWinningGuessCalculated && <SelectWinnerButton />}
+        {/*<SelectWinnerButton />*/}
         {isSubmissionPhase() && (
           <div id="submissionTitle">SUBMISSION PHASE IS OPEN</div>
         )}

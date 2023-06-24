@@ -2,19 +2,15 @@ import { Button, useAppStore } from "../../../shared";
 import React from "react";
 
 export const StartGameButton = () => {
-  const [connect, disconnect, wallet, startGame, isContractOwner] = useAppStore(
-    (state) => [
-      state.connect,
-      state.disconnect,
-      state.wallet,
-      state.startGame,
-      state.isContractOwner,
-    ]
-  );
+  const [startGame, isContractOwner, isGameStarted] = useAppStore((state) => [
+    state.startGame,
+    state.isContractOwner,
+    state.isGameStarted,
+  ]);
 
   return (
     <Button
-      disabled={!isContractOwner}
+      disabled={!isContractOwner || isGameStarted}
       // loading={!!wallet?.loading}
       onClick={startGame}
     >
