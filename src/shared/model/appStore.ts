@@ -328,7 +328,6 @@ export const useAppStore = create<AppStore>()((set, get) => ({
     const TXOptions = {
       from: get().wallet?.accounts[0],
       gas: 5000000,
-      value: fee,
     };
 
     if (contract) {
@@ -344,9 +343,9 @@ export const useAppStore = create<AppStore>()((set, get) => ({
     const contract = get().contractInstance;
     if (contract) {
       try {
-        await contract?.methods
-          .calculateWinningGuess()
-          .call({ from: get().wallet?.accounts[0] });
+        await contract?.methods.calculateWinningGuess().send({
+          from: get().wallet?.accounts[0],
+        });
       } catch (error: any) {
         toast.error(error.message);
       }
@@ -370,7 +369,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       try {
         await contract?.methods
           .selectWinner()
-          .call({ from: get().wallet?.accounts[0] });
+          .send({ from: get().wallet?.accounts[0] });
       } catch (error: any) {
         toast.error(error.message);
       }
