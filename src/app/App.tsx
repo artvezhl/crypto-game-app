@@ -59,6 +59,24 @@ function App() {
     );
   }, [endRevealingPeriodBlock, currentBlock, revealingPeriod]);
 
+  const blocks = useMemo<number>(() => {
+    if (isSubmittingPhaseActive && endSubmissionPeriodBlock && currentBlock)
+      return endSubmissionPeriodBlock - currentBlock > 0
+        ? endSubmissionPeriodBlock - currentBlock
+        : 0;
+    if (isRevealPhaseActive && endRevealingPeriodBlock && currentBlock)
+      return endRevealingPeriodBlock - currentBlock > 0
+        ? endRevealingPeriodBlock - currentBlock
+        : 0;
+    return 0;
+  }, [
+    isSubmittingPhaseActive,
+    endSubmissionPeriodBlock,
+    currentBlock,
+    isRevealPhaseActive,
+    endRevealingPeriodBlock,
+  ]);
+
   useEffect(() => {
     init();
   }, [init]);
@@ -101,6 +119,10 @@ function App() {
         )}
         {isRevealPhaseActive && (
           <div id="revealTitle">REVEAL PHASE IS OPEN</div>
+        )}
+
+        {(isSubmittingPhaseActive || isRevealPhaseActive) && (
+          <CountdownTimer blocks={blocks} />
         )}
 
         {wallet?.accounts.length &&

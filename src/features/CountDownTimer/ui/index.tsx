@@ -1,33 +1,25 @@
 import React, { useEffect, useState } from "react";
 
-export const CountdownTimer = ({ endTime }: { endTime?: number }) => {
-  const [countDown, setCountDown] = useState(0);
+export const CountdownTimer = ({ blocks }: { blocks: number }) => {
+  const [countDown, setCountDown] = useState(blocks * 12 * 1000);
 
   useEffect(() => {
-    if (!endTime) return;
-    // const countDownDate = new Date(endTime);
-    const countDownDate = new Date(endTime);
-
     const interval = setInterval(() => {
-      const now = new Date().getTime();
-      const distance = +countDownDate - now;
+      setCountDown((prevCountDown) => prevCountDown - 1000); // Уменьшаем таймер на 1 секунду (1000 миллисекунд)
 
-      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-
-      setCountDown(seconds);
-
-      if (distance < 0) {
+      if (countDown <= 0) {
         clearInterval(interval);
         setCountDown(0);
       }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [endTime]);
+  }, [blocks]);
 
   const formatTime = (time: number) => {
-    const seconds = time % 60;
-    return `${seconds}с`;
+    const minutes = Math.floor(time / (1000 * 60));
+    const seconds = Math.floor((time / 1000) % 60);
+    return `${minutes}м ${seconds}с`;
   };
 
   return countDown ? (

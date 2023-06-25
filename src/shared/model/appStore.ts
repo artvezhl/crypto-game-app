@@ -282,6 +282,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
         await toast.promise(startGame, {
           pending: "Waiting for the game to start",
         });
+        set({ isGameStarted: false });
       } catch (error: any) {
         set({ isGameStarted: false });
         console.log("ERROR", error);
@@ -289,17 +290,25 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       }
     }
   },
-  setCountdownTimer: (endTime: number) => {
-    const countDownDate = new Date(endTime);
+  setCountdownTimer: () => {
+    // const countDownDate = new Date(endTime);
+    // const initialSeconds = blocksNumber * 12;
 
     const interval = setInterval(() => {
-      const now = new Date().getTime();
-      const distance = +countDownDate - now;
+      const currentBlock = get().currentBlock;
+      const endSubmissionPeriodBlock = get().endSubmissionPeriodBlock;
+      const endRevealingPeriodBlock = get().endRevealingPeriodBlock;
 
-      const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-      set({ countdownTimer: seconds });
+      if (currentBlock && endSubmissionPeriodBlock && endRevealingPeriodBlock) {
+        console.log("CURRENT BLOCK", currentBlock);
+        let seconds = 0;
 
-      if (distance < 0) {
+        if (endSubmissionPeriodBlock - currentBlock > 0) {
+          seconds = endSubmissionPeriodBlock - currentBlock * 12;
+        }
+
+        set({ countdownTimer: seconds });
+      } else {
         clearInterval(interval);
         set({ countdownTimer: 0 });
       }

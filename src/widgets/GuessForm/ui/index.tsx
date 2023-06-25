@@ -7,6 +7,10 @@ type TFields = "guess" | "salt";
 export const GuessForm: React.FC<{ isSubmittingPhase: boolean }> = ({
   isSubmittingPhase,
 }) => {
+  const [enterGuess, revealSaltAndGuess] = useAppStore((state) => [
+    state.enterGuess,
+    state.revealSaltAndGuess,
+  ]);
   const [formState, setFormState] = useState<{ [T in TFields]: number }>({
     guess: 0,
     salt: 0,
@@ -32,9 +36,11 @@ export const GuessForm: React.FC<{ isSubmittingPhase: boolean }> = ({
     <form
       onSubmit={async (event) => {
         event.preventDefault();
-        console.log("formState", formState);
-        // if (isRevealPhase()) await revealSaltAndGuess(formState);
-        // if (isSubmissionPhase()) await enterGuess(formState);
+        if (!isSubmittingPhase) {
+          await revealSaltAndGuess(formState);
+        } else {
+          await enterGuess(formState);
+        }
       }}
     >
       <div className="flex">
@@ -51,7 +57,7 @@ export const GuessForm: React.FC<{ isSubmittingPhase: boolean }> = ({
           onClick={() => handleVisibilityChange("guess")}
         >
           <i
-            className={`fas ${!isSubmittingPhase ? "fa-eye" : "fa-eye-slash"}`}
+            className={`fas ${visibilityState ? "fa-eye" : "fa-eye-slash"}`}
             id="toggleGuessVisibility"
           ></i>
         </Button>
@@ -70,14 +76,14 @@ export const GuessForm: React.FC<{ isSubmittingPhase: boolean }> = ({
           onClick={() => handleVisibilityChange("salt")}
         >
           <i
-            className={`fas ${!isSubmittingPhase ? "fa-eye" : "fa-eye-slash"}`}
+            className={`fas ${visibilityState ? "fa-eye" : "fa-eye-slash"}`}
             id="toggleGuessVisibility"
           ></i>
         </Button>
       </div>
-      {/*<Button type="submit">{`${*/}
-      {/*  isRevealPhase() ? "Reveal" : "Submit"*/}
-      {/*} your guess`}</Button>*/}
+      <Button type="submit">{`${
+        !isSubmittingPhase ? "Reveal" : "Submit"
+      } your guess`}</Button>
     </form>
   );
 };
