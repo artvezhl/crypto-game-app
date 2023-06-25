@@ -1,6 +1,7 @@
 import { Button, Input, useAppStore } from "../../../shared";
 import { ChangeEventHandler, useState } from "react";
 import { EButtonVariant } from "../../../shared/ui/Button";
+import { toast } from "react-toastify";
 
 type TFields = "guess" | "salt";
 
@@ -28,7 +29,6 @@ export const GuessForm: React.FC<{ isSubmittingPhase: boolean }> = ({
   };
 
   const handleVisibilityChange = (field: TFields) => {
-    console.log("FIELD", field);
     setVisibilityState((prev) => ({ ...prev, [field]: !prev[field] }));
   };
 
@@ -36,11 +36,19 @@ export const GuessForm: React.FC<{ isSubmittingPhase: boolean }> = ({
     <form
       onSubmit={async (event) => {
         event.preventDefault();
+        if (formState.guess < 0 || formState.guess > 1000) {
+          toast.error("Guess value must be a digit between 0 and 1000");
+          return;
+        }
         if (!isSubmittingPhase) {
           await revealSaltAndGuess(formState);
         } else {
           await enterGuess(formState);
         }
+        setFormState({
+          guess: 0,
+          salt: 0,
+        });
       }}
     >
       <div className="flex">

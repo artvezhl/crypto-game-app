@@ -111,9 +111,9 @@ function App() {
         {isContractOwner && isGuessesSubmitted && isSaltSubmitted && (
           <CalculateWinningButton />
         )}
-        {/*<CalculateWinningButton />*/}
-        {isContractOwner && isWinningGuessCalculated && <SelectWinnerButton />}
-        {/*<SelectWinnerButton />*/}
+        {isContractOwner && <CalculateWinningButton />}
+        {/*{isContractOwner && isWinningGuessCalculated && <SelectWinnerButton />}*/}
+        {isContractOwner && <SelectWinnerButton />}
         {isSubmittingPhaseActive && (
           <div id="submissionTitle">SUBMISSION PHASE IS OPEN</div>
         )}

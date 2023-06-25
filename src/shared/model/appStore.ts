@@ -35,10 +35,10 @@ type AppStoreActions = {
   init: () => Promise<void>;
   initBlocksSubscription: () => Promise<void>;
   initGamePeriods: () => Promise<void>;
+  initGameSubmissionSubscription: () => Promise<void>;
   connect: () => Promise<void>;
   disconnect: () => void;
   startGame: () => void;
-  setCountdownTimer: (endTime: number) => void;
   enterGuess: (values: { guess: number; salt: number }) => Promise<void>;
   revealSaltAndGuess: (values: {
     guess: number;
@@ -127,6 +127,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
 
       await get().initGamePeriods();
       await get().initBlocksSubscription();
+      await get().initGameSubmissionSubscription();
     }
   },
   initBlocksSubscription: async () => {
@@ -188,6 +189,23 @@ export const useAppStore = create<AppStore>()((set, get) => ({
         toast.error(error?.message);
       }
     }
+  },
+  initGameSubmissionSubscription: async () => {
+    const contract = get().contractInstance;
+    const guessSubmittedSubscription = await contract?.events.GuessSubmitted();
+
+    guessSubmittedSubscription?.on("data", async (eventLog) => {
+      console.log("eventLog", eventLog);
+      if (eventLog.returnValues.player) toast.success("The guess is submitted");
+
+      set({ isGuessesSubmitted: true });
+
+      await guessSubmittedSubscription.unsubscribe();
+    });
+    guessSubmittedSubscription?.on("error", (error) => {
+      console.log("Error when subscribing: ", error);
+      throw error;
+    });
   },
   connect: async () => {
     const web3 = get().web3;
@@ -290,34 +308,15 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       }
     }
   },
-  setCountdownTimer: () => {
-    // const countDownDate = new Date(endTime);
-    // const initialSeconds = blocksNumber * 12;
-
-    const interval = setInterval(() => {
-      const currentBlock = get().currentBlock;
-      const endSubmissionPeriodBlock = get().endSubmissionPeriodBlock;
-      const endRevealingPeriodBlock = get().endRevealingPeriodBlock;
-
-      if (currentBlock && endSubmissionPeriodBlock && endRevealingPeriodBlock) {
-        console.log("CURRENT BLOCK", currentBlock);
-        let seconds = 0;
-
-        if (endSubmissionPeriodBlock - currentBlock > 0) {
-          seconds = endSubmissionPeriodBlock - currentBlock * 12;
-        }
-
-        set({ countdownTimer: seconds });
-      } else {
-        clearInterval(interval);
-        set({ countdownTimer: 0 });
-      }
-    }, 1000);
-  },
   enterGuess: async (values) => {
     const { guess, salt } = values;
+    const web3 = get().web3;
+    const encodedSalt = web3?.utils.soliditySha3(salt);
+
     const contract = get().contractInstance;
-    if (contract) {
+    if (contract && guess && encodedSalt) {
+      const hashedFullGuess = web3?.utils.soliditySha3(guess, encodedSalt);
+
       try {
         const fee: BigInt | undefined = await contract?.methods
           .participationFee()
@@ -327,36 +326,38 @@ export const useAppStore = create<AppStore>()((set, get) => ({
           gas: 5000000,
           value: fee,
         };
-        contract?.methods
+        const enterGuess = contract?.methods
           // @ts-ignore
-          .enterGuess(guess, salt)
+          .enterGuess(hashedFullGuess)
           // @ts-ignore
-          .send(TXOptions)
-          .then((data) => {
-            toast.success("Transaction sent");
-          })
-          .catch((error) => toast.error(error?.message));
+          .send(TXOptions);
 
-        const guessSubmittedSubscription =
-          await contract?.events.GuessSubmitted();
+        enterGuess.catch((error: any) => toast.error(error?.message));
 
-        guessSubmittedSubscription?.on("data", async (eventLog) => {
-          toast.success("The guess is submitted");
-
-          set({ isGuessesSubmitted: true });
-
-          await guessSubmittedSubscription.unsubscribe();
+        await toast.promise(enterGuess, {
+          pending: "Waiting for the guess enter",
+          success: "The guess is saved",
         });
-        guessSubmittedSubscription.on("error", (error) => {
-          throw error;
-          console.log("Error when subscribing: ", error);
-        });
+
+        // const guessSubmittedSubscription =
+        //   await contract?.events.GuessSubmitted();
+        //
+        // guessSubmittedSubscription?.on("data", async (eventLog) => {
+        //   toast.success("The guess is submitted");
+        //
+        //   set({ isGuessesSubmitted: true });
+        //
+        //   await guessSubmittedSubscription.unsubscribe();
+        // });
+        // guessSubmittedSubscription.on("error", (error) => {
+        //   throw error;
+        //   console.log("Error when subscribing: ", error);
+        // });
       } catch (error: any) {
         toast.error(error?.message);
       }
     }
   },
-  // SET GAS ESTIMATION
   revealSaltAndGuess: async (values) => {
     const { guess, salt } = values;
     const contract = get().contractInstance;
@@ -366,15 +367,22 @@ export const useAppStore = create<AppStore>()((set, get) => ({
         gas: 5000000,
       };
       try {
-        contract?.methods
+        const revealSaltAndGuess = contract?.methods
           // @ts-ignore
           .revealSaltAndGuess(guess, salt)
           // @ts-ignore
-          .send(TXOptions)
+          .send(TXOptions);
+
+        revealSaltAndGuess
           .then((data) => {
             toast.success("Transaction sent");
           })
           .catch((error) => toast.error(error?.message));
+
+        await toast.promise(revealSaltAndGuess, {
+          pending: "Waiting for the guess ans salt revealed",
+          success: "Guess and salt are successfully revealed",
+        });
 
         // const allGuessesSubmittedSubscription =
         //   await contract?.events.AllGuessesSubmitted();
@@ -413,6 +421,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       try {
         await contract?.methods.calculateWinningGuess().send({
           from: get().wallet?.accounts[0],
+          gas: "5000000",
         });
         const winningGuessCalculatedSubscription =
           await contract?.events.WinningGuessCalculated();
@@ -428,6 +437,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
           throw error;
         });
       } catch (error: any) {
+        console.log("ERROR", error);
         toast.error(error.message);
       }
     }
