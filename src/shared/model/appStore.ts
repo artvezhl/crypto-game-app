@@ -14,8 +14,10 @@ type AppStoreState = {
   contractInstance: Contract<typeof ABI> | null;
   wallet: TWallet | null;
   isContractOwner: boolean;
-  endTimerTime?: number;
-  endTimerRevealTime?: number;
+  currentBlock?: number;
+  startGameBlock?: number;
+  endSubmissionPeriodBlock?: number;
+  endRevealingPeriodBlock?: number;
   submissionPeriod: number;
   revealingPeriod: number;
   countdownTimer: number;
@@ -31,7 +33,8 @@ type AppStoreActions = {
   isRevealPhase: () => boolean;
   isCalculateWinningPhase: () => boolean;
   init: () => Promise<void>;
-  initEventSubscription: () => Promise<void>;
+  initBlocksSubscription: () => Promise<void>;
+  initGamePeriods: () => Promise<void>;
   connect: () => Promise<void>;
   disconnect: () => void;
   startGame: () => void;
@@ -51,8 +54,10 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   contractInstance: null,
   wallet: null,
   isContractOwner: false,
-  endTimerTime: undefined,
-  endTimerRevealTime: undefined,
+  currentBlock: undefined,
+  startGameBlock: undefined,
+  endSubmissionPeriodBlock: undefined,
+  endRevealingPeriodBlock: undefined,
   submissionPeriod: 0,
   revealingPeriod: 0,
   countdownTimer: 0,
@@ -62,21 +67,20 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   isWinningGuessCalculated: false,
   isPhase: () => get().isSubmissionPhase() || get().isRevealPhase(),
   isSubmissionPhase: () => {
-    const submission = get().endTimerTime;
-    if (!submission) return false;
+    const currentBlock = get().currentBlock;
+    const endSubmissionPeriodBlock = get().endSubmissionPeriodBlock;
 
-    return (
-      submission - new Date().getTime() < 60000 &&
-      submission - new Date().getTime() > 0
-    );
+    if (!endSubmissionPeriodBlock || !currentBlock) return false;
+
+    return endSubmissionPeriodBlock - currentBlock > 0;
   },
   isRevealPhase: () => {
-    const reveal = get().endTimerRevealTime;
-    if (!reveal) return false;
+    const currentBlock = get().currentBlock;
+    const endRevealingPeriodBlock = get().endRevealingPeriodBlock;
 
-    return (
-      reveal - new Date().getTime() > 0 && reveal - new Date().getTime() < 60000
-    );
+    if (!endRevealingPeriodBlock || !currentBlock) return false;
+
+    return endRevealingPeriodBlock - currentBlock > 0;
   },
   isCalculateWinningPhase: () => !get().isPhase(),
   period: null,
@@ -92,14 +96,21 @@ export const useAppStore = create<AppStore>()((set, get) => ({
       );
       if (contractInstance) set({ contractInstance });
 
-      const pastStartedEvents = await contractInstance.getPastEvents(
-        // @ts-ignore
-        "GameStarted",
-        {
-          fromBlock: "earliest",
-          toBlock: "latest",
-        }
-      );
+      // Get the latest block number
+      const latestBlockNumber = await web3.eth.getBlockNumber();
+      const submissionPeriod = await get()
+        .contractInstance?.methods.submissionPeriod()
+        .call();
+      const revealPeriod = await get()
+        .contractInstance?.methods.revealPeriod()
+        .call();
+
+      set({
+        currentBlock: Number(latestBlockNumber),
+        submissionPeriod: Number(submissionPeriod),
+        revealingPeriod: Number(revealPeriod),
+      });
+
       if (localStorage.getItem("wallet")) {
         const contractOwner: string | undefined = await get()
           .contractInstance?.methods.owner()
@@ -114,108 +125,69 @@ export const useAppStore = create<AppStore>()((set, get) => ({
         }));
       }
 
-      const submissionPeriod = await get()
-        .contractInstance?.methods.submissionPeriod()
-        .call();
-      const revealPeriod = await get()
-        .contractInstance?.methods.revealPeriod()
-        .call();
-      if (
-        typeof submissionPeriod === "number" &&
-        typeof revealPeriod === "number"
-      )
-        set({
-          submissionPeriod: Number(submissionPeriod) * 1000,
-          revealingPeriod: Number(revealPeriod) * 1000,
-        });
-      if (pastStartedEvents.length) {
-        const lastEvent: any = pastStartedEvents[pastStartedEvents.length - 1];
-        const timestamp = lastEvent?.returnValues.timestamp;
-        const endTimerTime =
-          (Number(timestamp) + Number(submissionPeriod)) * 1000;
-        const endTimerRevealTime =
-          (Number(timestamp) +
-            Number(submissionPeriod) +
-            Number(revealPeriod)) *
-          1000;
-        set({ endTimerTime, endTimerRevealTime });
-      }
-      // await get().initEventSubscription();
+      await get().initGamePeriods();
+      await get().initBlocksSubscription();
     }
   },
-  initEventSubscription: async () => {
-    const contract = get().contractInstance;
+  initBlocksSubscription: async () => {
+    const web3 = get().web3;
+    try {
+      const subscription = await web3?.eth.subscribe(
+        "newBlockHeaders",
+        (error: any, result: any) => {
+          if (error) {
+            toast.error(error.message);
+          }
+        }
+      );
 
-    const gameStartedEventSubscription = contract?.events.GameStarted();
-    const guessSubmittedEventSubscription = contract?.events.GuessSubmitted();
-    const winningGuessCalculatedEventSubscription =
-      contract?.events.WinningGuessCalculated();
+      subscription?.on("data", function (transaction) {
+        set({ currentBlock: Number(transaction.number) });
+      });
+      subscription?.on("error", (error: any) => {
+        throw error;
+      });
+    } catch (error: any) {
+      toast.error(error?.message);
+    }
+  },
+  initGamePeriods: async () => {
+    const contractInstance = get().contractInstance;
+    const web3 = get().web3;
     const submissionPeriod = get().submissionPeriod;
+    const revealingPeriod = get().revealingPeriod;
 
-    const allGuessesSubmittedSubscription =
-      await contract?.events.AllGuessesSubmitted();
-    const allSaltSubmittedSubscription =
-      await contract?.events.AllGuessesSubmitted();
+    if (contractInstance && submissionPeriod && revealingPeriod) {
+      try {
+        const latestBlock = await web3?.eth.getBlockNumber();
+        const latestBlockNumber = Number(latestBlock);
+        const pastStartedEvents = await contractInstance.getPastEvents(
+          // @ts-ignore
+          "GameStarted",
+          {
+            fromBlock: latestBlockNumber - submissionPeriod - revealingPeriod,
+            toBlock: latestBlockNumber,
+          }
+        );
 
-    allGuessesSubmittedSubscription?.on("data", async (eventLog) => {
-      toast.success("All guesses are submitted");
+        if (pastStartedEvents.length) {
+          const lastEvent: any =
+            pastStartedEvents[pastStartedEvents.length - 1];
+          const startGameBlock = Number(lastEvent?.returnValues.timestamp);
+          const endSubmissionPeriodBlock = startGameBlock + submissionPeriod;
+          const endRevealingPeriodBlock =
+            startGameBlock + submissionPeriod + revealingPeriod;
 
-      set({ isGuessesSubmitted: true });
-
-      await allGuessesSubmittedSubscription.unsubscribe();
-    });
-    allGuessesSubmittedSubscription?.on("error", (error) => {
-      throw error;
-    });
-
-    allSaltSubmittedSubscription?.on("data", async (eventLog) => {
-      toast.success("All salt is submitted");
-
-      set({ isSaltSubmitted: true });
-
-      await allSaltSubmittedSubscription.unsubscribe();
-    });
-    allSaltSubmittedSubscription?.on("error", (error) => {
-      throw error;
-    });
-
-    // if (gameStartedEventSubscription) {
-    //   gameStartedEventSubscription.on("data", async (event) => {
-    //     toast.success("The game is started");
-    //     const timestamp = event.returnValues.timestamp;
-    //     const endTimerTime =
-    //       (Number(timestamp) + Number(submissionPeriod)) * 1000;
-    //     set({ endTimerTime });
-    //
-    //     await gameStartedEventSubscription.unsubscribe();
-    //   });
-    //   gameStartedEventSubscription.on("error", (error) => {
-    //     toast.error(error.message);
-    //     console.error("Subscription error:", error);
-    //   });
-    // }
-    //
-    // if (winningGuessCalculatedEventSubscription) {
-    //   winningGuessCalculatedEventSubscription.on("data", async (event) => {
-    //     console.log("EVENT WINNING VALUES", event);
-    //     toast.success("The winning guess is calculated");
-    //     await winningGuessCalculatedEventSubscription.unsubscribe();
-    //   });
-    //   winningGuessCalculatedEventSubscription.on("error", (error) => {
-    //     toast.error(error.message);
-    //     console.error("Subscription error:", error);
-    //   });
-    // }
-    //
-    // if (guessSubmittedEventSubscription) {
-    //   guessSubmittedEventSubscription.on("data", async (event) => {
-    //     await guessSubmittedEventSubscription.unsubscribe();
-    //     set({ isGuessesSubmitted: true });
-    //   });
-    //   guessSubmittedEventSubscription.on("error", (error) => {
-    //     console.error("guessSubmittedEventSubscription error:", error);
-    //   });
-    // }
+          set({
+            startGameBlock,
+            endSubmissionPeriodBlock,
+            endRevealingPeriodBlock,
+          });
+        }
+      } catch (error: any) {
+        toast.error(error?.message);
+      }
+    }
   },
   connect: async () => {
     const web3 = get().web3;
@@ -276,38 +248,39 @@ export const useAppStore = create<AppStore>()((set, get) => ({
     set({ isGameStarted: true });
     const gasPrice = await get().web3?.eth.getGasPrice();
     const contract = get().contractInstance;
-    const submissionPeriod = get().submissionPeriod;
     const gasEstimation = await contract?.methods
       .startGame()
       .estimateGas({ from: get().wallet?.accounts[0] });
     if (contract) {
       try {
-        contract?.methods
-          .startGame()
-          .send({
-            from: get().wallet?.accounts[0],
-            gas: (Number(gasEstimation) * 100).toString(),
-            gasPrice: (Number(gasPrice) * 1000).toString(),
+        const startGame = contract?.methods.startGame().send({
+          from: get().wallet?.accounts[0],
+          gas: Number(gasEstimation).toString(),
+          gasPrice: (Number(gasPrice) * 1000).toString(),
+        });
+
+        startGame
+          .then((data) => {
+            const startGameBlock = Number(data.blockNumber);
+            const submissionPeriod = get().submissionPeriod;
+            const revealingPeriod = get().revealingPeriod;
+            const endSubmissionPeriodBlock = startGameBlock + submissionPeriod;
+            const endRevealingPeriodBlock =
+              endSubmissionPeriodBlock + revealingPeriod;
+            set({
+              startGameBlock,
+              endSubmissionPeriodBlock,
+              endRevealingPeriodBlock,
+            });
+            toast.success("The game is started");
           })
-          .then((data) => console.log("DATA", data))
           .catch((error) => {
             toast.error(error?.message);
             set({ isGameStarted: false });
           });
-        const startGameSubscription = await contract?.events.GameStarted();
 
-        startGameSubscription?.on("data", async (eventLog) => {
-          toast.success("The game is started");
-          const timestamp = eventLog.returnValues.timestamp;
-          const endTimerTime =
-            (Number(timestamp) + Number(submissionPeriod)) * 1000;
-          set({ endTimerTime });
-
-          await startGameSubscription.unsubscribe();
-        });
-        startGameSubscription.on("error", (error) => {
-          set({ isGameStarted: false });
-          throw error;
+        await toast.promise(startGame, {
+          pending: "Waiting for the game to start",
         });
       } catch (error: any) {
         set({ isGameStarted: false });

@@ -4,14 +4,9 @@ import { EButtonVariant } from "../../../shared/ui/Button";
 
 type TFields = "guess" | "salt";
 
-export const GuessForm = () => {
-  const [enterGuess, isRevealPhase, isSubmissionPhase, revealSaltAndGuess] =
-    useAppStore((state) => [
-      state.enterGuess,
-      state.isRevealPhase,
-      state.isSubmissionPhase,
-      state.revealSaltAndGuess,
-    ]);
+export const GuessForm: React.FC<{ isSubmittingPhase: boolean }> = ({
+  isSubmittingPhase,
+}) => {
   const [formState, setFormState] = useState<{ [T in TFields]: number }>({
     guess: 0,
     salt: 0,
@@ -38,17 +33,16 @@ export const GuessForm = () => {
       onSubmit={async (event) => {
         event.preventDefault();
         console.log("formState", formState);
-        if (isRevealPhase()) await revealSaltAndGuess(formState);
-        if (isSubmissionPhase()) await enterGuess(formState);
+        // if (isRevealPhase()) await revealSaltAndGuess(formState);
+        // if (isSubmissionPhase()) await enterGuess(formState);
       }}
     >
       <div className="flex">
         <Input
           label="Your guess"
           id="guess"
-          type={visibilityState.guess ? "number" : "password"}
+          type={!isSubmittingPhase ? "number" : "password"}
           placeholder="Your guess"
-          // disabled
           onChange={handleChangeValue}
         />
         <Button
@@ -57,9 +51,7 @@ export const GuessForm = () => {
           onClick={() => handleVisibilityChange("guess")}
         >
           <i
-            className={`fas ${
-              !visibilityState.guess ? "fa-eye" : "fa-eye-slash"
-            }`}
+            className={`fas ${!isSubmittingPhase ? "fa-eye" : "fa-eye-slash"}`}
             id="toggleGuessVisibility"
           ></i>
         </Button>
@@ -68,9 +60,8 @@ export const GuessForm = () => {
         <Input
           label="Your salt"
           id="salt"
-          type={visibilityState.salt ? "number" : "password"}
+          type={!isSubmittingPhase ? "number" : "password"}
           placeholder="Your salt"
-          // disabled
           onChange={handleChangeValue}
         />
         <Button
@@ -79,16 +70,14 @@ export const GuessForm = () => {
           onClick={() => handleVisibilityChange("salt")}
         >
           <i
-            className={`fas ${
-              !visibilityState.salt ? "fa-eye" : "fa-eye-slash"
-            }`}
+            className={`fas ${!isSubmittingPhase ? "fa-eye" : "fa-eye-slash"}`}
             id="toggleGuessVisibility"
           ></i>
         </Button>
       </div>
-      <Button type="submit">{`${
-        isRevealPhase() ? "Reveal" : "Submit"
-      } your guess`}</Button>
+      {/*<Button type="submit">{`${*/}
+      {/*  isRevealPhase() ? "Reveal" : "Submit"*/}
+      {/*} your guess`}</Button>*/}
     </form>
   );
 };

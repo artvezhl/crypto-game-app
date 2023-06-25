@@ -18,8 +18,6 @@ function App() {
     init,
     wallet,
     isContractOwner,
-    endTimerTime,
-    endTimerRevealTime,
     isSubmissionPhase,
     isRevealPhase,
     isPhase,
@@ -27,12 +25,14 @@ function App() {
     isSaltSubmitted,
     countdownTimer,
     isWinningGuessCalculated,
+    currentBlock,
+    endSubmissionPeriodBlock,
+    endRevealingPeriodBlock,
+    revealingPeriod,
   ] = useAppStore((state) => [
     state.init,
     state.wallet,
     state.isContractOwner,
-    state.endTimerTime,
-    state.endTimerRevealTime,
     state.isSubmissionPhase,
     state.isRevealPhase,
     state.isPhase,
@@ -40,7 +40,24 @@ function App() {
     state.isSaltSubmitted,
     state.countdownTimer,
     state.isWinningGuessCalculated,
+    state.currentBlock,
+    state.endSubmissionPeriodBlock,
+    state.endRevealingPeriodBlock,
+    state.revealingPeriod,
   ]);
+
+  const isSubmittingPhaseActive = useMemo<boolean>(() => {
+    if (!endSubmissionPeriodBlock || !currentBlock) return false;
+    return endSubmissionPeriodBlock - currentBlock > 0;
+  }, [endSubmissionPeriodBlock, currentBlock]);
+
+  const isRevealPhaseActive = useMemo<boolean>(() => {
+    if (!endRevealingPeriodBlock || !currentBlock) return false;
+    return (
+      endRevealingPeriodBlock - currentBlock > 0 &&
+      endRevealingPeriodBlock - currentBlock <= revealingPeriod
+    );
+  }, [endRevealingPeriodBlock, currentBlock, revealingPeriod]);
 
   useEffect(() => {
     init();
@@ -70,28 +87,27 @@ function App() {
         </div>
 
         {isContractOwner &&
-          !isPhase() &&
-          !isGuessesSubmitted &&
-          !isSaltSubmitted && <StartGameButton />}
+          !isSubmittingPhaseActive &&
+          !isRevealPhaseActive && <StartGameButton />}
+
         {isContractOwner && isGuessesSubmitted && isSaltSubmitted && (
           <CalculateWinningButton />
         )}
         {/*<CalculateWinningButton />*/}
         {isContractOwner && isWinningGuessCalculated && <SelectWinnerButton />}
         {/*<SelectWinnerButton />*/}
-        {isSubmissionPhase() && (
+        {isSubmittingPhaseActive && (
           <div id="submissionTitle">SUBMISSION PHASE IS OPEN</div>
         )}
-        {isRevealPhase() && <div id="revealTitle">REVEAL PHASE IS OPEN</div>}
-        {isPhase() && (
-          <CountdownTimer
-            endTime={isSubmissionPhase() ? endTimerTime : endTimerRevealTime}
-          />
+        {isRevealPhaseActive && (
+          <div id="revealTitle">REVEAL PHASE IS OPEN</div>
         )}
 
         {wallet?.accounts.length &&
           !isContractOwner &&
-          (isSubmissionPhase() || isRevealPhase()) && <GuessForm />}
+          (isSubmittingPhaseActive || isRevealPhaseActive) && (
+            <GuessForm isSubmittingPhase={isSubmittingPhaseActive} />
+          )}
 
         {/*<button id="calculateWinningGuessButton" disabled>*/}
         {/*  Calculate winning guess*/}

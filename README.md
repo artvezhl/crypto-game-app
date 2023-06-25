@@ -5,9 +5,10 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 ## Available Scripts
 
 ### Before run the project
-1. add ABI file with `GuessTheNumberGame.json` name to the `src/shared/data` folder 
+1. add ABI (only ABI, not compiled file) file with `GuessTheNumberGame.json` name to the `src/shared/data` folder 
 2. add .env file with following variables:
    - REACT_APP_CONTRACT_ADDRESS
+3. run `npm install`
 
 ### In the project directory, you can run:
 
