@@ -18,12 +18,7 @@ function App() {
     init,
     wallet,
     isContractOwner,
-    isSubmissionPhase,
-    isRevealPhase,
-    isPhase,
     isGuessesSubmitted,
-    isSaltSubmitted,
-    countdownTimer,
     isWinningGuessCalculated,
     currentBlock,
     endSubmissionPeriodBlock,
@@ -34,12 +29,7 @@ function App() {
     state.init,
     state.wallet,
     state.isContractOwner,
-    state.isSubmissionPhase,
-    state.isRevealPhase,
-    state.isPhase,
     state.isGuessesSubmitted,
-    state.isSaltSubmitted,
-    state.countdownTimer,
     state.isWinningGuessCalculated,
     state.currentBlock,
     state.endSubmissionPeriodBlock,
@@ -134,13 +124,6 @@ function App() {
           (isSubmittingPhaseActive || isRevealPhaseActive) && (
             <GuessForm isSubmittingPhase={isSubmittingPhaseActive} />
           )}
-
-        {/*<button id="calculateWinningGuessButton" disabled>*/}
-        {/*  Calculate winning guess*/}
-        {/*</button>*/}
-        {/*<button id="selectWinnerButton" disabled>*/}
-        {/*  Select winner*/}
-        {/*</button>*/}
       </body>
       <ToastContainer position="bottom-right" />
     </>

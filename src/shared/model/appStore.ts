@@ -32,10 +32,6 @@ type AppStoreState = {
 };
 
 type AppStoreActions = {
-  isPhase: () => boolean;
-  isSubmissionPhase: () => boolean;
-  isRevealPhase: () => boolean;
-  isCalculateWinningPhase: () => boolean;
   init: () => Promise<void>;
   initBlocksSubscription: () => Promise<void>;
   initGamePeriods: () => Promise<void>;
@@ -74,24 +70,6 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   isGuessesSubmitted: false,
   isSaltSubmitted: false,
   isWinningGuessCalculated: false,
-  isPhase: () => get().isSubmissionPhase() || get().isRevealPhase(),
-  isSubmissionPhase: () => {
-    const currentBlock = get().currentBlock;
-    const endSubmissionPeriodBlock = get().endSubmissionPeriodBlock;
-
-    if (!endSubmissionPeriodBlock || !currentBlock) return false;
-
-    return endSubmissionPeriodBlock - currentBlock > 0;
-  },
-  isRevealPhase: () => {
-    const currentBlock = get().currentBlock;
-    const endRevealingPeriodBlock = get().endRevealingPeriodBlock;
-
-    if (!endRevealingPeriodBlock || !currentBlock) return false;
-
-    return endRevealingPeriodBlock - currentBlock > 0;
-  },
-  isCalculateWinningPhase: () => !get().isPhase(),
   period: null,
   init: async () => {
     if (window.ethereum) {
@@ -196,7 +174,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
                   }
                   case "WinningGuessCalculated": {
                     set({
-                      isSubmissionPeriod: false,
+                      isGuessesSubmitted: false,
                       isWinningGuessCalculated: true,
                     });
                     break;
@@ -447,9 +425,12 @@ export const useAppStore = create<AppStore>()((set, get) => ({
     const contract = get().contractInstance;
     if (contract) {
       try {
-        await contract?.methods.calculateWinningGuess().send({
+        const calculated = contract?.methods.calculateWinningGuess().send({
           from: get().wallet?.accounts[0],
           gas: "5000000",
+        });
+        await toast.promise(calculated, {
+          pending: "Waiting for calculating winnings",
         });
         const winningGuessCalculatedSubscription =
           await contract?.events.WinningGuessCalculated();
@@ -471,13 +452,18 @@ export const useAppStore = create<AppStore>()((set, get) => ({
     const contract = get().contractInstance;
     if (contract) {
       try {
-        await contract?.methods
+        const selectWinner = contract?.methods
           .selectWinner()
-          .send({ from: get().wallet?.accounts[0] })
-          .then((data) => {
-            toast.success("The winner is selected");
-            set({ isWinningGuessCalculated: false, isGameStarted: false });
-          });
+          .send({ from: get().wallet?.accounts[0] });
+
+        selectWinner.then((data) => {
+          toast.success("The winner is selected");
+          set({ isWinningGuessCalculated: false, isGameStarted: false });
+        });
+
+        await toast.promise(selectWinner, {
+          pending: "Waiting for a winner selecting",
+        });
       } catch (error: any) {
         toast.error(error.message);
       }
