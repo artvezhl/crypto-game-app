@@ -29,6 +29,7 @@ function App() {
     endSubmissionPeriodBlock,
     endRevealingPeriodBlock,
     revealingPeriod,
+    isGameStarted,
   ] = useAppStore((state) => [
     state.init,
     state.wallet,
@@ -44,6 +45,7 @@ function App() {
     state.endSubmissionPeriodBlock,
     state.endRevealingPeriodBlock,
     state.revealingPeriod,
+    state.isGameStarted,
   ]);
 
   const isSubmittingPhaseActive = useMemo<boolean>(() => {
@@ -106,14 +108,16 @@ function App() {
 
         {isContractOwner &&
           !isSubmittingPhaseActive &&
-          !isRevealPhaseActive && <StartGameButton />}
+          !isRevealPhaseActive &&
+          !isGameStarted && <StartGameButton />}
 
-        {isContractOwner && isGuessesSubmitted && isSaltSubmitted && (
-          <CalculateWinningButton />
-        )}
-        {isContractOwner && <CalculateWinningButton />}
+        {isContractOwner &&
+          !isSubmittingPhaseActive &&
+          !isRevealPhaseActive &&
+          isGuessesSubmitted && <CalculateWinningButton />}
+        {/*{isContractOwner && <CalculateWinningButton />}*/}
+        {isContractOwner && isWinningGuessCalculated && <SelectWinnerButton />}
         {/*{isContractOwner && isWinningGuessCalculated && <SelectWinnerButton />}*/}
-        {isContractOwner && <SelectWinnerButton />}
         {isSubmittingPhaseActive && (
           <div id="submissionTitle">SUBMISSION PHASE IS OPEN</div>
         )}
