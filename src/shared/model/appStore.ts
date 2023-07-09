@@ -1,7 +1,8 @@
 import { create } from "zustand";
-import Web3, { Contract } from "web3";
+import Web3, { Contract, NonPayableCallOptions } from "web3";
 import ABI from "../data/GuessTheNumberGame.json";
 import { toast } from "react-toastify";
+import { log } from "util";
 
 export type TWallet = {
   connected: boolean;
@@ -29,6 +30,7 @@ type AppStoreState = {
   isGuessesSubmitted: boolean;
   isSaltSubmitted: boolean;
   isWinningGuessCalculated: boolean;
+  winners: string[];
 };
 
 type AppStoreActions = {
@@ -47,6 +49,7 @@ type AppStoreActions = {
   }) => Promise<void>;
   calculateWinningGuess: () => Promise<void>;
   selectWinner: () => Promise<void>;
+  getWinners: () => Promise<void>;
 };
 type AppStore = AppStoreState & AppStoreActions;
 
@@ -71,6 +74,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   isSaltSubmitted: false,
   isWinningGuessCalculated: false,
   period: null,
+  winners: [],
   init: async () => {
     if (window.ethereum) {
       // create WEB3 instance
@@ -115,6 +119,8 @@ export const useAppStore = create<AppStore>()((set, get) => ({
           isContractOwner: wallet.accounts[0] === contractOwner,
         }));
       }
+
+      await get().getWinners(); // TODO remove, added for test
 
       await get().initGamePeriods();
       await get().initBlocksSubscription();
@@ -438,6 +444,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
           toast.success("The winning guess is calculated");
           set({ isGuessesSubmitted: false, isWinningGuessCalculated: true });
           await winningGuessCalculatedSubscription.unsubscribe();
+          await get().getWinners();
         });
         winningGuessCalculatedSubscription.on("error", (error) => {
           throw error;
@@ -466,6 +473,23 @@ export const useAppStore = create<AppStore>()((set, get) => ({
         });
       } catch (error: any) {
         toast.error(error.message);
+      }
+    }
+  },
+  // TODO update code to receive winners
+  getWinners: async () => {
+    const web3 = get().web3;
+    const contract = get().contractInstance;
+    if (contract) {
+      try {
+        const winner = await contract.methods
+          // @ts-ignore
+          .winningAddresses(web3?.utils.toBigInt(1))
+          .call();
+
+        console.log("WINNER", winner);
+      } catch (error) {
+        console.log("ERROR", error);
       }
     }
   },
