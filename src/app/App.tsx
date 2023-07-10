@@ -26,6 +26,7 @@ function App() {
     revealingPeriod,
     isGameStarted,
     winners,
+    checkWinnersActive,
     getWinners,
   ] = useAppStore((state) => [
     state.init,
@@ -39,6 +40,7 @@ function App() {
     state.revealingPeriod,
     state.isGameStarted,
     state.winners,
+    state.checkWinnersActive,
     state.getWinners,
   ]);
 
@@ -117,9 +119,11 @@ function App() {
         !isRevealPhaseActive &&
         !isGameStarted ? (
           <>
-            <button type="button" onClick={getWinners}>
-              Check winners
-            </button>
+            {checkWinnersActive ? (
+              <button type="button" onClick={getWinners}>
+                Check winners
+              </button>
+            ) : null}
             <StartGameButton />
           </>
         ) : null}

@@ -31,6 +31,7 @@ type AppStoreState = {
   isGuessesSubmitted: boolean;
   isSaltSubmitted: boolean;
   isWinningGuessCalculated: boolean;
+  checkWinnersActive: boolean;
   winners: Map<number, string>;
 };
 
@@ -75,6 +76,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   isSaltSubmitted: false,
   isWinningGuessCalculated: false,
   period: null,
+  checkWinnersActive: false,
   winners: new Map<number, string>(),
   init: async () => {
     if (window.ethereum) {
@@ -121,6 +123,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
         }));
       }
       await get().getWinners();
+      if (get().winners.size) set({ checkWinnersActive: true });
       await get().initGamePeriods();
       await get().initBlocksSubscription();
       await get().initGameSubmissionSubscription();
@@ -464,7 +467,11 @@ export const useAppStore = create<AppStore>()((set, get) => ({
 
         selectWinner.then(async (data) => {
           toast.success("The winner is selected");
-          set({ isWinningGuessCalculated: false, isGameStarted: false });
+          set({
+            isWinningGuessCalculated: false,
+            isGameStarted: false,
+            checkWinnersActive: true,
+          });
           setTimeout(() => get().getWinners(), 10000);
         });
 
