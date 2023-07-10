@@ -1,7 +1,9 @@
 import { create } from "zustand";
-import Web3, { Contract } from "web3";
+import Web3, { Contract, NonPayableCallOptions } from "web3";
 import ABI from "../data/GuessTheNumberGame.json";
 import { toast } from "react-toastify";
+import { log } from "util";
+import * as timers from "timers";
 
 export type TWallet = {
   connected: boolean;
@@ -29,6 +31,7 @@ type AppStoreState = {
   isGuessesSubmitted: boolean;
   isSaltSubmitted: boolean;
   isWinningGuessCalculated: boolean;
+  winners: Map<number, string>;
 };
 
 type AppStoreActions = {
@@ -47,6 +50,7 @@ type AppStoreActions = {
   }) => Promise<void>;
   calculateWinningGuess: () => Promise<void>;
   selectWinner: () => Promise<void>;
+  getWinners: () => Promise<void>;
 };
 type AppStore = AppStoreState & AppStoreActions;
 
@@ -71,6 +75,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   isSaltSubmitted: false,
   isWinningGuessCalculated: false,
   period: null,
+  winners: new Map<number, string>(),
   init: async () => {
     if (window.ethereum) {
       // create WEB3 instance
@@ -115,7 +120,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
           isContractOwner: wallet.accounts[0] === contractOwner,
         }));
       }
-
+      await get().getWinners();
       await get().initGamePeriods();
       await get().initBlocksSubscription();
       await get().initGameSubmissionSubscription();
@@ -313,6 +318,7 @@ export const useAppStore = create<AppStore>()((set, get) => ({
   },
   startGame: async () => {
     set({ isGameStarted: true });
+    await get().winners.clear();
     const gasPrice = await get().web3?.eth.getGasPrice();
     const contract = get().contractInstance;
     const gasEstimation = await contract?.methods
@@ -456,9 +462,10 @@ export const useAppStore = create<AppStore>()((set, get) => ({
           .selectWinner()
           .send({ from: get().wallet?.accounts[0] });
 
-        selectWinner.then((data) => {
+        selectWinner.then(async (data) => {
           toast.success("The winner is selected");
           set({ isWinningGuessCalculated: false, isGameStarted: false });
+          setTimeout(() => get().getWinners(), 10000);
         });
 
         await toast.promise(selectWinner, {
@@ -466,6 +473,37 @@ export const useAppStore = create<AppStore>()((set, get) => ({
         });
       } catch (error: any) {
         toast.error(error.message);
+      }
+    }
+  },
+  getWinners: async () => {
+    const contract = get().contractInstance;
+    if (contract) {
+      try {
+        let i = 0;
+        while (true) {
+          try {
+            const address: string = await contract.methods
+              // @ts-ignore
+              .winningAddresses(i)
+              .call();
+
+            set(() => {
+              const winners = new Map();
+              winners.set(i, address);
+              return {
+                winners,
+              };
+            });
+
+            i++;
+          } catch (error) {
+            console.error(error);
+            break;
+          }
+        }
+      } catch (error) {
+        console.error(error);
       }
     }
   },
